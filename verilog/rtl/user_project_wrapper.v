@@ -78,45 +78,82 @@ module user_project_wrapper #(
     output [2:0] user_irq
 );
 
-/*--------------------------------------*/
-/* User project is instantiated  here   */
-/*--------------------------------------*/
+    wire [159:0] frame_data;
+    wire [99:0] frame_strobe;
+    wire [25:0] fabric_pad_in;
+    wire [25:0] fabric_pad_out;
+    wire [25:0] fabric_pad_oeb;
+    wire configured;
+    wire config_busy;
+    wire spi_busy;
+    wire spi_done;
+    wire spi_sclk;
+    wire spi_mosi;
+    wire spi_cs_n;
+    wire [1:0] test_status;
 
-user_proj_example mprj (
-`ifdef USE_POWER_PINS
-	.vccd1(vccd1),	// User area 1 1.8V power
-	.vssd1(vssd1),	// User area 1 digital ground
-`endif
+    fabulous_control control (
+        .wb_clk_i(wb_clk_i),
+        .wb_rst_i(wb_rst_i),
+        .wbs_stb_i(wbs_stb_i),
+        .wbs_cyc_i(wbs_cyc_i),
+        .wbs_we_i(wbs_we_i),
+        .wbs_sel_i(wbs_sel_i),
+        .wbs_dat_i(wbs_dat_i),
+        .wbs_adr_i(wbs_adr_i),
+        .wbs_ack_o(wbs_ack_o),
+        .wbs_dat_o(wbs_dat_o),
+        .spi_miso_i(io_in[10]),
+        .spi_sclk_o(spi_sclk),
+        .spi_mosi_o(spi_mosi),
+        .spi_cs_n_o(spi_cs_n),
+        .frame_data_o(frame_data),
+        .frame_strobe_o(frame_strobe),
+        .fabric_pad_in_o(fabric_pad_in),
+        .fabric_pad_out_i(fabric_pad_out),
+        .configured_o(configured),
+        .config_busy_o(config_busy),
+        .spi_busy_o(spi_busy),
+        .spi_done_o(spi_done),
+        .test_status_o(test_status)
+    );
 
-    .wb_clk_i(wb_clk_i),
-    .wb_rst_i(wb_rst_i),
+    fabulous_fabric_adapter fabric_adapter (
+        .pad_in(fabric_pad_in),
+        .pad_out(fabric_pad_out),
+        .pad_oeb(fabric_pad_oeb),
+        .frame_data(frame_data),
+        .frame_strobe(frame_strobe)
+    );
 
-    // MGMT SoC Wishbone Slave
+    // GPIO 8..11 form the external SPI bus.  GPIO 12 reports configuration.
+    reg [`MPRJ_IO_PADS-1:0] io_out_reg;
+    reg [`MPRJ_IO_PADS-1:0] io_oeb_reg;
+    always @* begin
+        io_out_reg = {`MPRJ_IO_PADS{1'b0}};
+        io_oeb_reg = {`MPRJ_IO_PADS{1'b1}};
+        io_out_reg[8] = spi_sclk;
+        io_oeb_reg[8] = 1'b0;
+        io_out_reg[9] = spi_mosi;
+        io_oeb_reg[9] = 1'b0;
+        io_oeb_reg[10] = 1'b1;
+        io_out_reg[11] = spi_cs_n;
+        io_oeb_reg[11] = 1'b0;
+        io_out_reg[12] = configured;
+        io_oeb_reg[12] = 1'b0;
+        io_out_reg[14:13] = test_status;
+        io_oeb_reg[14:13] = 2'b00;
+    end
+    assign io_out = io_out_reg;
+    assign io_oeb = io_oeb_reg;
 
-    .wbs_cyc_i(wbs_cyc_i),
-    .wbs_stb_i(wbs_stb_i),
-    .wbs_we_i(wbs_we_i),
-    .wbs_sel_i(wbs_sel_i),
-    .wbs_adr_i(wbs_adr_i),
-    .wbs_dat_i(wbs_dat_i),
-    .wbs_ack_o(wbs_ack_o),
-    .wbs_dat_o(wbs_dat_o),
+    // Debug visibility without affecting normal operation.
+    assign la_data_out = {64'd0, fabric_pad_out, 34'd0,
+                          spi_done, spi_busy, config_busy, configured};
+    assign user_irq = {2'b00, spi_done};
 
-    // Logic Analyzer
-
-    .la_data_in(la_data_in),
-    .la_data_out(la_data_out),
-    .la_oenb (la_oenb),
-
-    // IO Pads
-
-    .io_in ({io_in[37:30],io_in[7:0]}),
-    .io_out({io_out[37:30],io_out[7:0]}),
-    .io_oeb({io_oeb[37:30],io_oeb[7:0]}),
-
-    // IRQ
-    .irq(user_irq)
-);
+    wire unused = &{1'b0, la_data_in, la_oenb, user_clock2,
+                    fabric_pad_oeb};
 
 endmodule	// user_project_wrapper
 
