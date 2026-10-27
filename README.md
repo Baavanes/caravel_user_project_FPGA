@@ -2,238 +2,250 @@
 
 <img src="https://umsousercontent.com/lib_lnlnuhLgkYnZdkSC/hj0vk05j0kemus1i.png" alt="ChipFoundry Logo" height="140" />
 
-[![Typing SVG](https://readme-typing-svg.demolab.com?font=Inter&size=44&duration=3000&pause=600&color=4C6EF5&center=true&vCenter=true&width=1100&lines=Caravel+User+Project+Template;OpenLane+%2B+ChipFoundry+Flow;Verification+and+Shuttle-Ready)](https://git.io/typing-svg)
+# Caravel Runtime-Reconfigurable FPGA Project
+
+### FABulous FPGA Fabric · RISC-V Configuration · SPI Demonstration · SKY130
 
 [![License](https://img.shields.io/badge/License-Apache%202.0-blue.svg)](https://opensource.org/licenses/Apache-2.0)
-[![ChipFoundry Marketplace](https://img.shields.io/badge/ChipFoundry-Marketplace-6E40C9.svg)](https://platform.chipfoundry.io/marketplace)
+[![Process](https://img.shields.io/badge/Process-SKY130-6E40C9.svg)](https://github.com/google/skywater-pdk)
+[![Verification](https://img.shields.io/badge/Verification-cocotb-2EA44F.svg)](#functional-verification)
 
 </div>
 
 ## Table of Contents
+
 - [Overview](#overview)
-- [Documentation & Resources](#documentation--resources)
-- [Prerequisites](#prerequisites)
-- [Project Structure](#project-structure)
-- [Starting Your Project](#starting-your-project)
-- [Development Flow](#development-flow)
-- [GPIO Configuration](#gpio-configuration)
-- [Local Precheck](#local-precheck)
-- [Checklist for Shuttle Submission](#checklist-for-shuttle-submission)
+- [Key Features](#key-features)
+- [System Architecture](#system-architecture)
+- [How It Works](#how-it-works)
+- [Repository Structure](#repository-structure)
+- [Getting Started](#getting-started)
+- [Functional Verification](#functional-verification)
+- [OpenLane Hardening](#openlane-hardening)
+- [Changing the FPGA Function](#changing-the-fpga-function)
+- [License](#license)
 
 ## Overview
-This repository contains a user project designed for integration into the **Caravel chip user space**. Use it as a template for integrating custom RTL with Caravel's system-on-chip (SoC) utilities, including:
 
-* **IO Pads:** Configurable general-purpose input/output.
-* **Logic Analyzer Probes:** 128 signals for non-intrusive hardware debugging.
-* **Wishbone Port:** A 32-bit standard bus interface for communication between the RISC-V management core and your custom hardware.
+This repository integrates a **5x5 FABulous FPGA fabric** into the ChipFoundry
+Caravel user area using the **SkyWater SKY130** process.
 
----
+Caravel's management RISC-V processor configures the FPGA at runtime by loading
+a generated bitstream through the user Wishbone interface. The demonstrated
+bitstream configures the FPGA as an SPI controller and communicates with an
+external SPI memory model during cocotb verification.
 
-## Documentation & Resources
-For detailed hardware specifications and register maps, refer to the following official documents:
+The FPGA fabric is reusable. A different function can be implemented by
+generating and loading another compatible bitstream without changing the
+Caravel wrapper or the physical FPGA macro.
 
-* **[Caravel Datasheet](https://github.com/chipfoundry/caravel/blob/main/docs/caravel_datasheet_2.pdf)**: Detailed electrical and physical specifications of the Caravel harness.
-* **[Caravel Technical Reference Manual (TRM)](https://github.com/chipfoundry/caravel/blob/main/docs/caravel_datasheet_2_register_TRM_r2.pdf)**: Complete register maps and programming guides for the management SoC.
-* **[ChipFoundry Marketplace](https://platform.chipfoundry.io/marketplace)**: Access additional IP blocks, EDA tools, and shuttle services.
+## Key Features
 
----
+- 5x5 runtime-reconfigurable FABulous FPGA fabric.
+- Integration with the Caravel user-project wrapper.
+- RISC-V-controlled FPGA bitstream loading through Wishbone.
+- SPI controller implemented inside the configured FPGA fabric.
+- Register-controlled SPI transmit, receive and status interface.
+- Cocotb verification with an external SPI memory model.
+- SKY130-compatible FPGA macro views for physical integration.
+- OpenLane configuration for hardening `user_project_wrapper`.
+- Support for replacing the SPI function with another FPGA design.
 
-## Prerequisites
-Ensure your environment meets the following requirements:
+## System Architecture
 
-1. **Docker** [Linux](https://docs.docker.com/desktop/setup/install/linux/ubuntu/) | [Windows](https://docs.docker.com/desktop/setup/install/windows-install/) | [Mac](https://docs.docker.com/desktop/setup/install/mac-install/)
-2. **Python 3.8+** with `pip`.
-3. **Git**: For repository management.
-
----
-
-## Project Structure
-A successful Caravel project requires a specific directory layout for the automated tools to function:
-
-| Directory | Description |
-| :--- | :--- |
-| `openlane/` | Configuration files for hardening macros and the wrapper. |
-| `verilog/rtl/` | Source Verilog code for the project. |
-| `verilog/gl/` | Gate-level netlists (generated after hardening). |
-| `verilog/dv/` | Design Verification (cocotb and Verilog testbenches). |
-| `gds/` | Final GDSII binary files for fabrication. |
-| `lef/` | Library Exchange Format files for the macros. |
-
----
-
-## Starting Your Project
-
-### 1. Repository Setup
-Create a new repository based on the `caravel_user_project` template and clone it to your local machine:
-
-```bash
-git clone <your-github-repo-URL>
-pip install chipfoundry-cli
-cd <project_name>
+```text
+Caravel Management SoC
+        |
+        | Wishbone
+        v
+FPGA Configuration and Control Interface
+        |
+        | Bitstream configuration
+        v
+5x5 FABulous FPGA Fabric
+        |
+        | SPI signals
+        v
+External SPI Device or Memory
 ```
 
-### 2. Platform Login
+The management processor is responsible for loading the bitstream and accessing
+the FPGA control registers. The SPI state machine, serial clock generation and
+data shifting are implemented by logic configured inside the FPGA fabric.
 
-Log in to the ChipFoundry platform (required before `cf init`, `cf push`, `cf pull`, etc.):
+## How It Works
+
+The demonstration follows this sequence:
+
+1. The Caravel management processor enables the user Wishbone interface.
+2. The FPGA user logic is held in reset.
+3. The firmware streams the SPI configuration bitstream into the FPGA.
+4. The configuration controller reports that the FPGA is ready.
+5. The processor releases the FPGA user reset.
+6. Firmware starts an SPI memory-write transaction.
+7. Firmware starts an SPI memory-read transaction.
+8. The returned data is checked by the firmware and cocotb testbench.
+
+The cocotb test models the external SPI device. It does not replace the SPI
+controller or directly configure the FPGA during the full Caravel test.
+
+## Repository Structure
+
+```text
+caravel_user_project_FPGA/
+|-- gds/
+|   `-- tiny_fabric_5x5.gds
+|-- lef/
+|   |-- tiny_fabric_5x5.lef
+|   `-- user_project_wrapper.lef
+|-- openlane/
+|   `-- user_project_wrapper/
+|       `-- config.json
+|-- verilog/
+|   |-- rtl/
+|   |   |-- fabric_config.v
+|   |   |-- fabulous_control.v
+|   |   |-- fabulous_fabric_adapter.v
+|   |   |-- fabulous_sim.v
+|   |   `-- user_project_wrapper.v
+|   |-- gl/
+|   |   |-- tiny_fabric_5x5.v
+|   |   `-- user_project_wrapper.v
+|   |-- includes/
+|   |   `-- includes.rtl.caravel_user_project
+|   `-- dv/cocotb/
+|       |-- cocotb_tests.py
+|       `-- fabulous_spi/
+|           |-- fabulous_spi.c
+|           |-- fabulous_spi.py
+|           |-- fabulous_spi.yaml
+|           `-- runtime_spi_bitstream.h
+|-- Makefile
+`-- README.md
+```
+
+### Main Components
+
+| Component | Description |
+|---|---|
+| `fabric_config.v` | Converts processor configuration writes into FPGA frame data and strobes. |
+| `fabulous_control.v` | Provides the Wishbone configuration and control registers. |
+| `fabulous_fabric_adapter.v` | Connects the generated FPGA fabric to the fixed Caravel interface. |
+| `fabulous_sim.v` | Generated FPGA model used during RTL simulation. |
+| `user_project_wrapper.v` | Integrates the control interface and FPGA into Caravel. |
+| `fabulous_spi.c` | Management RISC-V firmware for configuration and SPI testing. |
+| `fabulous_spi.py` | Cocotb test and external SPI memory model. |
+| `runtime_spi_bitstream.h` | Generated FPGA configuration data used by firmware. |
+
+## Getting Started
+
+### Prerequisites
+
+- Linux
+- Git
+- Docker
+- Python 3.8 or newer
+- ChipFoundry CLI
+
+Install the required command-line tools:
+
+```bash
+sudo apt-get update
+sudo apt-get install -y git python3 python3-pip docker.io
+python3 -m pip install --user chipfoundry-cli
+```
+
+### Clone the Repository
+
+```bash
+git clone https://github.com/Baavanes/caravel_user_project_FPGA.git
+cd caravel_user_project_FPGA
+```
+
+### Initialize the Caravel Environment
 
 ```bash
 cf login
-```
-
-### 3. Project Initialization
-
-> [!IMPORTANT]
-> Run this first! Initialize your project configuration:
-
-```bash
 cf init
-```
-
-This creates `.cf/project.json` with project metadata. **This must be run before any other commands** (`cf setup`, `cf gpio-config`, `cf harden`, `cf precheck`, `cf verify`).
-
-### 4. Environment Setup
-Install the ChipFoundry CLI tool and set up the local environment (PDKs, OpenLane, and Caravel lite):
-
-```bash
 cf setup
+cf gpio-config
 ```
 
-The `cf setup` command installs:
+`cf setup` installs the Caravel simulation environment, management-core model,
+PDK and hardening tools required by the project.
 
-- Caravel Lite: The Caravel SoC template.
-- Management Core: RISC-V management area required for simulation.
-- OpenLane: The RTL-to-GDS hardening flow.
-- PDK: Skywater 130nm process design kit.
-- Timing Scripts: For Static Timing Analysis (STA).
+## Functional Verification
 
----
-
-## Development Flow
-
-### Hardening the Design
-Hardening is the process of synthesizing your RTL and performing Place & Route (P&R) to create a GDSII layout.
-
-#### Macro Hardening
-Create a subdirectory for each custom macro under `openlane/` containing your `config.tcl`.
+Run the SPI cocotb test with the ChipFoundry CLI:
 
 ```bash
-cf harden --list         # List detected configurations
-cf harden <macro_name>   # Harden a specific macro
+cf verify fabulous_spi
 ```
 
-#### Integration
-Instantiate your module(s) in `verilog/rtl/user_project_wrapper.v`.
+The test performs the following checks:
 
-Update `openlane/user_project_wrapper/config.json` environment variables (`VERILOG_FILES_BLACKBOX`, `EXTRA_LEFS`, `EXTRA_GDS_FILES`) to point to your new macros.
+- Caravel management-processor startup.
+- Wishbone access to the FPGA configuration interface.
+- FPGA bitstream loading.
+- FPGA configuration completion.
+- SPI write transaction.
+- SPI read transaction.
+- Firmware and cocotb result checking.
 
-#### Wrapper Hardening
-Finalize the top-level user project:
+A successful run reports:
+
+```text
+TESTS=1 PASS=1 FAIL=0
+```
+
+The cocotb source and RISC-V firmware are located under:
+
+```text
+verilog/dv/cocotb/fabulous_spi/
+```
+
+## OpenLane Hardening
+
+The FPGA macro physical views used by the wrapper flow are located at:
+
+```text
+gds/tiny_fabric_5x5.gds
+lef/tiny_fabric_5x5.lef
+```
+
+Run the Caravel wrapper hardening flow with:
 
 ```bash
 cf harden user_project_wrapper
 ```
 
-### Verification
+The OpenLane wrapper configuration is located at:
 
-#### 1. Simulation
-We use cocotb for functional verification. Ensure your file lists are updated in `verilog/includes/`.
-
-**Configure GPIO settings first (required before verification):**
-
-```bash
-cf gpio-config
+```text
+openlane/user_project_wrapper/config.json
 ```
 
-This interactive command will:
-- Configure all GPIO pins interactively
-- Automatically update `verilog/rtl/user_defines.v`
-- Automatically run `gen_gpio_defaults.py` to generate GPIO defaults for simulation
+After hardening, use the ChipFoundry verification and precheck commands that
+are appropriate for the target shuttle or development environment.
 
-GPIO configuration is required before running any verification tests.
+## Changing the FPGA Function
 
-Run RTL Simulation:
+The FPGA function is selected by its bitstream. To implement a different
+function:
 
-```bash
-cf verify <test_name>
-```
+1. Create RTL using the supported FPGA interface.
+2. Synthesize and place-and-route the design for the 5x5 FABulous fabric.
+3. Generate the new FPGA bitstream.
+4. Convert the bitstream into a firmware-compatible data array.
+5. Update the RISC-V firmware to load and exercise the new design.
+6. Add cocotb checks for the new functionality.
+7. Run the FPGA-level and full Caravel verification flows.
 
-Run Gate-Level (GL) Simulation:
+The same physical FPGA macro and Caravel wrapper can be reused when the new
+design fits in the available fabric and uses the existing interface.
 
-```bash
-cf verify <test_name> --sim gl
-```
+## License
 
-Run all tests:
-
-```bash
-cf verify --all
-```
-
-#### 2. Static Timing Analysis (STA)
-Verify that your design meets timing constraints using OpenSTA:
-
-```bash
-make extract-parasitics
-make create-spef-mapping
-make caravel-sta
-```
-
-> [!NOTE]
-> Run `make setup-timing-scripts` if you need to update the STA environment.
-
----
-
-## GPIO Configuration
-Configure the power-on default configuration for each GPIO using the interactive CLI tool.
-
-**Use the GPIO configuration command:**
-```bash
-cf gpio-config
-```
-
-This command will:
-- Present an interactive form for configuring GPIO pins 5-37 (GPIO 0-4 are fixed system pins)
-- Show available GPIO modes with descriptions
-- Allow selection by number, partial key, or full mode name
-- Save configuration to `.cf/project.json` (as hex values)
-- Automatically update `verilog/rtl/user_defines.v` with the new configuration
-- Automatically run `gen_gpio_defaults.py` to generate GPIO defaults for simulation (if Caravel is installed)
-
-**GPIO Pin Information:**
-- GPIO[0] to GPIO[4]: Preset system pins (do not change).
-- GPIO[5] to GPIO[37]: User-configurable pins.
-
-**Available GPIO Modes:**
-- Management modes: `mgmt_input_nopull`, `mgmt_input_pulldown`, `mgmt_input_pullup`, `mgmt_output`, `mgmt_bidirectional`, `mgmt_analog`
-- User modes: `user_input_nopull`, `user_input_pulldown`, `user_input_pullup`, `user_output`, `user_bidirectional`, `user_output_monitored`, `user_analog`
-
-> [!NOTE]
-> GPIO configuration is required before running `cf precheck` or `cf verify`. Invalid modes cannot be saved - all GPIOs must have valid configurations.
-
----
-
-## Local Precheck
-Before submitting your design for fabrication, run the local precheck to ensure it complies with all shuttle requirements:
-
-> [!IMPORTANT]
-> GPIO configuration is required before running precheck. Make sure you've run `cf gpio-config` first.
-
-```bash
-cf precheck
-```
-
-You can also run specific checks or disable LVS:
-
-```bash
-cf precheck --disable-lvs                    # Skip LVS check
-cf precheck --checks gpio_defines --checks xor  # Run specific checks only
-```
----
-
-## Checklist for Shuttle Submission
-- [ ] Top-level macro is named user_project_wrapper.
-- [ ] Full Chip Simulation passes for both RTL and GL.
-- [ ] Hardened Macros are LVS and DRC clean.
-- [ ] user_project_wrapper matches the required pin order/template.
-- [ ] Design passes the local cf precheck.
-- [ ] Documentation (this README) is updated with project-specific details
+This project retains the Apache 2.0 license and notices of the ChipFoundry
+Caravel user-project template. Third-party components remain under their
+respective licenses. See [LICENSE](LICENSE) for details.
