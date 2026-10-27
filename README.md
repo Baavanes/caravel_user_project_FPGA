@@ -236,4 +236,4 @@ cf precheck --checks gpio_defines --checks xor  # Run specific checks only
 - [ ] Hardened Macros are LVS and DRC clean.
 - [ ] user_project_wrapper matches the required pin order/template.
 - [ ] Design passes the local cf precheck.
-- [ ] Documentation (this README) is updated with project-specific details.
+- [ ] Documentation (this README) is updated with project-specific details
