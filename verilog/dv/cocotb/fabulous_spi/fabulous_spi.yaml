@@ -1,0 +1,3 @@
+---
+Tests:
+  - {name: fabulous_spi, sim: RTL}
