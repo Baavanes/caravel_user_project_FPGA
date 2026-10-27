@@ -2,58 +2,47 @@
     "//": "Design files",
     "VERILOG_FILES": [
         "dir::../../verilog/rtl/defines.v",
+        "dir::../../verilog/rtl/fabric_config.v",
+        "dir::../../verilog/rtl/fabulous_control.v",
+        "dir::../../verilog/rtl/fabulous_fabric_adapter.v",
         "dir::../../verilog/rtl/user_project_wrapper.v"
     ],
     "PNR_SDC_FILE": "dir::signoff.sdc",
     
     "//": "Hardening strategy variables (this is for 1-Macro-First Hardening). Visit https://docs.google.com/document/d/1pf-wbpgjeNEM-1TcvX2OJTkHjqH_C9p-LURCASS0Zo8 for more info",
-    "SYNTH_ELABORATE_ONLY": true,
-    "RUN_POST_GPL_DESIGN_REPAIR": false,
-    "RUN_POST_CTS_RESIZER_TIMING": false,
+    "SYNTH_ELABORATE_ONLY": false,
+    "RUN_POST_GPL_DESIGN_REPAIR": true,
+    "RUN_POST_CTS_RESIZER_TIMING": true,
     "DESIGN_REPAIR_BUFFER_INPUT_PORTS": false,
-    "FP_PDN_ENABLE_RAILS": false,
-    "RUN_ANTENNA_REPAIR": false,
-    "RUN_FILL_INSERTION": false,
-    "RUN_TAP_ENDCAP_INSERTION": false,
-    "RUN_CTS": false,
+    "FP_PDN_ENABLE_RAILS": true,
+    "RUN_ANTENNA_REPAIR": true,
+    "RUN_FILL_INSERTION": true,
+    "RUN_TAP_ENDCAP_INSERTION": true,
+    "RUN_CTS": true,
     "RUN_IRDROP_REPORT": false,
-    "ERROR_ON_SYNTH_CHECKS": false,
+    "ERROR_ON_SYNTH_CHECKS": true,
 
     "//": "Macros configurations",
     "MACROS": {
-        "user_proj_example": {
+        "tiny_fabric_5x5": {
             "gds": [
-                "dir::../../gds/user_proj_example.gds"
+                "dir::../../gds/tiny_fabric_5x5.gds"
             ],
             "lef": [
-                "dir::../../lef/user_proj_example.lef"
+                "dir::../../lef/tiny_fabric_5x5.lef"
             ],
             "instances": {
-                "mprj": {
-                    "location": [60, 15],
+                "fabric_adapter.fabric": {
+                    "location": [150, 150],
                     "orientation": "N"
                 }
             },
             "nl": [
-                "dir::../../verilog/gl/user_proj_example.v"
-            ],
-            "spef": {
-                "min_*": [
-                    "dir::../../spef/multicorner/user_proj_example.min.spef"
-                ],
-                "nom_*": [
-                    "dir::../../spef/multicorner/user_proj_example.nom.spef"
-                ],
-                "max_*": [
-                    "dir::../../spef/multicorner/user_proj_example.max.spef"
-                ]
-            },
-            "lib": {
-                "*": "dir::../../lib/user_proj_example.lib"
-            }
+                "dir::../../verilog/gl/tiny_fabric_5x5.v"
+            ]
         }
     },
-    "PDN_MACRO_CONNECTIONS": ["mprj vccd2 vssd2 vccd1 vssd1"],
+    "PDN_MACRO_CONNECTIONS": ["fabric_adapter.fabric vccd1 vssd1 VPWR VGND"],
 
     "//": "PDN configurations",
     "FP_PDN_VOFFSET": 5,
